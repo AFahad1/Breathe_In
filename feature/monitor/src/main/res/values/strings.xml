@@ -1,0 +1,4 @@
+<resources>
+    <string name="monitor_notification_title">Breathe In is looking out for you</string>
+    <string name="monitor_channel_name">Monitoring</string>
+</resources>

@@ -1,15 +1,27 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
+# Gradle / build outputs
+.gradle/
+build/
+.kotlin/
 .externalNativeBuild
 .cxx
+/captures
+
+# Local machine config
 local.properties
+
+# Signing
+*.jks
+*.keystore
+
+# IDE workspace files (shared code style and run configs stay committed)
+*.iml
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/deploymentTargetSelector.xml
+.idea/shelf/
+.DS_Store

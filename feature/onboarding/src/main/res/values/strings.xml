@@ -1,0 +1,13 @@
+<resources>
+    <string name="onboarding_title">Welcome to Breathe In</string>
+    <string name="onboarding_body">Breathe In gently interrupts long Instagram sessions with a short breathing break. It needs three permissions to do that.</string>
+    <string name="onboarding_usage_title">Usage access</string>
+    <string name="onboarding_usage_description">To know when Instagram is open and how long you\'ve used it today.</string>
+    <string name="onboarding_overlay_title">Display over other apps</string>
+    <string name="onboarding_overlay_description">To show the breathing break on top of Instagram.</string>
+    <string name="onboarding_notifications_title">Notifications</string>
+    <string name="onboarding_notifications_description">To show that Breathe In is running.</string>
+    <string name="onboarding_grant">Grant</string>
+    <string name="onboarding_granted">Granted</string>
+    <string name="onboarding_start">Start monitoring</string>
+</resources>

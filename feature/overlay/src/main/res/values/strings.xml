@@ -1,0 +1,8 @@
+<resources>
+    <string name="overlay_today_usage">%1$s today: %2$d min</string>
+    <string name="overlay_breathe_in">Breathe in</string>
+    <string name="overlay_breathe_out">Breathe out</string>
+    <string name="overlay_finished">How do you feel?</string>
+    <string name="overlay_im_done">I\'m done</string>
+    <string name="overlay_keep_scrolling">Keep scrolling</string>
+</resources>

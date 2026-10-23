@@ -1,0 +1,30 @@
+<resources>
+    <string name="debug_permissions">Permissions</string>
+    <string name="debug_permission_usage">Usage access</string>
+    <string name="debug_permission_overlay">Display over other apps</string>
+    <string name="debug_permission_notifications">Notifications</string>
+    <string name="debug_yes">✓ Granted</string>
+    <string name="debug_no">✗ Missing</string>
+
+    <string name="debug_monitoring">Monitoring</string>
+    <string name="debug_monitoring_service">Monitor service</string>
+    <string name="debug_running">● Running</string>
+    <string name="debug_stopped">○ Stopped</string>
+    <string name="debug_foreground_app">Foreground app: %1$s</string>
+    <string name="debug_unknown">unknown</string>
+    <string name="debug_session_active">Instagram session: %1$d s</string>
+    <string name="debug_session_idle">No Instagram session</string>
+    <string name="debug_interruption_shown">Interruption shown this session</string>
+    <string name="debug_start_monitoring">Start monitoring</string>
+    <string name="debug_stop_monitoring">Stop monitoring</string>
+
+    <string name="debug_threshold">Interrupt after %1$d min</string>
+
+    <string name="debug_overlay">Overlay</string>
+    <string name="debug_test_overlay">Test overlay</string>
+    <string name="debug_test_overlay_delayed">Test overlay in 5 s (switch to another app)</string>
+
+    <string name="debug_today_usage">Today\'s top apps</string>
+    <string name="debug_refresh">Refresh</string>
+    <string name="debug_minutes">%1$d min</string>
+</resources>
