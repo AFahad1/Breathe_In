@@ -6,12 +6,14 @@ internal data class PermissionSnapshot(
     val usageAccess: Boolean,
     val overlay: Boolean,
     val notifications: Boolean,
+    val accessibility: Boolean,
 ) {
     companion object {
         fun from(checker: PermissionChecker) = PermissionSnapshot(
             usageAccess = checker.hasUsageAccess(),
             overlay = checker.canDrawOverlays(),
             notifications = checker.hasNotificationPermission(),
+            accessibility = checker.hasAccessibilityService(),
         )
     }
 }

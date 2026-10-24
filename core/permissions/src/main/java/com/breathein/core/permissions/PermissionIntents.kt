@@ -10,6 +10,8 @@ object PermissionIntents {
 
     fun usageAccess(): Intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
 
+    fun accessibility(): Intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+
     fun overlay(context: Context): Intent =
         Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
 

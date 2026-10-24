@@ -9,22 +9,18 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.breathein.core.common.ViewIdCapture
 import com.breathein.core.model.AppUsage
+import com.breathein.core.model.ScrollFeature
 import com.breathein.core.model.SessionState
-import com.breathein.core.settings.SettingsRepository
-import kotlin.math.roundToInt
 
 @Composable
 internal fun PermissionsSection(permissions: PermissionSnapshot) {
@@ -32,14 +28,16 @@ internal fun PermissionsSection(permissions: PermissionSnapshot) {
         StatusLine(stringResource(R.string.debug_permission_usage), permissions.usageAccess)
         StatusLine(stringResource(R.string.debug_permission_overlay), permissions.overlay)
         StatusLine(stringResource(R.string.debug_permission_notifications), permissions.notifications)
+        StatusLine(stringResource(R.string.debug_permission_accessibility), permissions.accessibility)
     }
 }
 
 @Composable
 internal fun MonitoringSection(
     isMonitoring: Boolean,
-    session: SessionState,
+    sessions: List<SessionState>,
     foregroundPackage: String?,
+    labelFor: (String) -> String,
     onStart: () -> Unit,
     onStop: () -> Unit,
 ) {
@@ -51,14 +49,11 @@ internal fun MonitoringSection(
             notOkText = stringResource(R.string.debug_stopped),
         )
         Text(stringResource(R.string.debug_foreground_app, foregroundPackage ?: stringResource(R.string.debug_unknown)))
-        Text(
-            if (session.isActive) {
-                stringResource(R.string.debug_session_active, session.elapsedSeconds)
-            } else {
-                stringResource(R.string.debug_session_idle)
-            },
-        )
-        if (session.interruptionShown) Text(stringResource(R.string.debug_interruption_shown))
+        if (sessions.isEmpty()) Text(stringResource(R.string.debug_session_idle))
+        sessions.forEach { session ->
+            val line = stringResource(R.string.debug_session_active, labelFor(session.packageName), session.elapsedSeconds)
+            Text(if (session.interruptionShown) "$line · ${stringResource(R.string.debug_interruption_shown)}" else line)
+        }
         if (isMonitoring) {
             OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.debug_stop_monitoring))
@@ -72,20 +67,42 @@ internal fun MonitoringSection(
 }
 
 @Composable
-internal fun ThresholdSection(thresholdMinutes: Int, onThresholdChange: (Int) -> Unit) {
-    // Local while dragging; saved when the finger lifts.
-    var sliderValue by remember(thresholdMinutes) { mutableFloatStateOf(thresholdMinutes.toFloat()) }
-    val min = SettingsRepository.MIN_THRESHOLD_MINUTES
-    val max = SettingsRepository.MAX_THRESHOLD_MINUTES
+internal fun MonitoredAppsSection(monitoredAppCount: Int, onOpen: () -> Unit) {
+    DebugCard(title = stringResource(R.string.debug_monitored_apps)) {
+        Text(stringResource(R.string.debug_monitored_apps_count, monitoredAppCount))
+        Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.debug_edit_monitored_apps))
+        }
+    }
+}
 
-    DebugCard(title = stringResource(R.string.debug_threshold, sliderValue.roundToInt())) {
-        Slider(
-            value = sliderValue,
-            onValueChange = { sliderValue = it },
-            onValueChangeFinished = { onThresholdChange(sliderValue.roundToInt()) },
-            valueRange = min.toFloat()..max.toFloat(),
-            steps = max - min - 1,
+@Composable
+internal fun DetectionSection(
+    connected: Boolean,
+    activeFeature: ScrollFeature?,
+    capture: ViewIdCapture?,
+    onCapture: () -> Unit,
+) {
+    DebugCard(title = stringResource(R.string.debug_detection)) {
+        StatusLine(
+            label = stringResource(R.string.debug_detection_service),
+            ok = connected,
+            okText = stringResource(R.string.debug_connected),
+            notOkText = stringResource(R.string.debug_not_connected),
         )
+        Text(stringResource(R.string.debug_detected_feature, activeFeature?.name ?: stringResource(R.string.debug_none)))
+        OutlinedButton(onClick = onCapture, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.debug_capture_view_ids))
+        }
+        if (capture != null) {
+            Text(
+                text = stringResource(R.string.debug_captured_from, capture.packageName, capture.viewIds.size),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            SelectionContainer {
+                Text(capture.viewIds.joinToString("\n"), style = MaterialTheme.typography.bodySmall)
+            }
+        }
     }
 }
 

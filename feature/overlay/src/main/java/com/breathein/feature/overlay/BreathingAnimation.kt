@@ -10,8 +10,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 
-internal enum class BreathingPhase { BreatheIn, BreatheOut, Finished }
+internal enum class BreathingPhase { BreatheIn, Hold, BreatheOut, Finished }
 
 @Stable
 internal class BreathingState {
@@ -25,18 +26,21 @@ internal class BreathingState {
     }
 }
 
-/** Runs [cycles] of breathe in / breathe out, then moves to [BreathingPhase.Finished]. */
+/** Runs [cycles] of breathe in / hold / breathe out, then moves to [BreathingPhase.Finished]. */
 @Composable
 internal fun rememberBreathingState(
     cycles: Int = 3,
-    breatheInMillis: Int = 4_000,
-    breatheOutMillis: Int = 4_000,
+    breatheInMillis: Int = 5_000,
+    holdMillis: Long = 2_000,
+    breatheOutMillis: Int = 5_000,
 ): BreathingState {
     val state = remember { BreathingState() }
     LaunchedEffect(state) {
         repeat(cycles) {
             state.phase = BreathingPhase.BreatheIn
             state.scale.animateTo(BreathingState.MAX_SCALE, tween(breatheInMillis, easing = FastOutSlowInEasing))
+            state.phase = BreathingPhase.Hold
+            delay(holdMillis)
             state.phase = BreathingPhase.BreatheOut
             state.scale.animateTo(BreathingState.MIN_SCALE, tween(breatheOutMillis, easing = FastOutSlowInEasing))
         }

@@ -1,13 +1,13 @@
 # Breathe In — Android MVP
 
 ## What this app does
-Breathe In interrupts doom scrolling. While the user is scrolling Instagram (later TikTok etc.), the app interrupts **mid-session** with a full-screen breathing animation drawn over Instagram. The user then either keeps scrolling or stops and does a short, wholesome check-in ("Something worth sharing with your family?").
+Breathe In interrupts doom scrolling. While the user is scrolling short-form feeds (Instagram Reels, YouTube Shorts, TikTok) or any other app they pick, the app interrupts **mid-session** with a full-screen breathing animation drawn over that app. The user then either keeps scrolling or stops and does a short, wholesome check-in ("Something worth sharing with your family?").
 
 This is a feasibility MVP. Priorities: prove the interruption works mid-scroll, prove we can read usage data. Keep it simple; no backend, no network calls.
 
 ## Current scope (scaffold)
-Build only: app shell, permissions, usage tracking, Instagram session monitoring, and the breathing overlay.
-Not yet: check-in, event log database, notification mode, other apps, visual design. Leave clear TODOs and empty interfaces where these will plug in.
+Built: app shell, permissions, usage tracking, per-app session monitoring, Reels/Shorts detection (accessibility service), the Monitored apps page (which apps + limit per app), and the breathing overlay.
+Not yet: check-in, event log database, notification mode, visual design. Leave clear TODOs and empty interfaces where these will plug in.
 
 ## Tech stack
 - Kotlin, Jetpack Compose, Material 3 (default theme for now)
@@ -21,15 +21,17 @@ Modular so two developers can work in parallel without touching each other's fil
 
 ```
 :app                  Application class, AppContainer (wires everything), MainActivity, navigation
-:core:model           Plain data classes: AppUsage, SessionState, InterruptionRequest, InterruptionOutcome
-:core:common          Interfaces shared across features (see Contracts) + constants (e.g. INSTAGRAM_PACKAGE)
-:core:permissions     PermissionChecker: hasUsageAccess(), canDrawOverlays(), hasNotificationPermission(), and Intents to open each settings page
-:core:settings        SettingsRepository (DataStore): interruption threshold, monitoring on/off
+:core:model           Plain data classes: AppUsage, AppInfo, MonitoredApp, SessionState, ScrollFeature, ShortFormApp, InterruptionRequest, InterruptionOutcome
+:core:common          Interfaces shared across features (see Contracts), ShortFormApps list + constants (package names)
+:core:permissions     PermissionChecker: hasUsageAccess(), canDrawOverlays(), hasNotificationPermission(), hasAccessibilityService(), and Intents to open each settings page
+:core:settings        SettingsRepository (DataStore): monitored apps + limit per app, monitoring on/off
 :feature:usage        UsageRepository implementation using UsageStatsManager / UsageEvents
-:feature:monitor      Foreground service + SessionTracker (times continuous Instagram sessions, fires interruptions)
+:feature:scrolldetect AccessibilityService that detects Reels / Shorts on screen by view ID (FeatureMarkers)
+:feature:monitor      Foreground service + SessionTracker (one per monitored app; times continuous sessions, fires interruptions)
 :feature:overlay      Overlay implementation: WindowManager + ComposeView + breathing animation
+:feature:apps         Monitored apps page: pick apps and a limit for each
 :feature:onboarding   Permission onboarding screen
-:feature:debug        Debug screen: permission status, today's per-app usage, live session state, "test overlay" button
+:feature:debug        Debug screen: permission status, today's per-app usage, live sessions, detected feed, view-ID capture, "test overlay" button
 ```
 
 ## Contracts (in :core:common)
@@ -37,30 +39,37 @@ Modular so two developers can work in parallel without touching each other's fil
   - `fun currentForegroundPackage(): String?`
   - `fun todayUsage(): List<AppUsage>` (package, label, minutes)
   - `fun todayMinutesFor(packageName: String): Int`
+  - `fun launchableApps(): List<AppInfo>`, `fun labelFor(packageName: String): String`
+- `ScrollFeatureDetector`
+  - `val isConnected: StateFlow<Boolean>`, `val activeFeature: StateFlow<ScrollFeature?>`
+  - `fun requestViewIdCapture()` + `val lastViewIdCapture` (debug aid for keeping view IDs current)
+- `MonitorController` — `isRunning`, `sessions: StateFlow<List<SessionState>>`, `start()`, `stop()`
 - `InterruptionTrigger`
   - `fun show(request: InterruptionRequest, onOutcome: (InterruptionOutcome) -> Unit)`
   - `fun dismiss()`
 - `InterruptionOutcome` = `KeepScrolling` | `ImDone`
 
-`:feature:monitor` depends only on these interfaces. `:feature:overlay` implements `InterruptionTrigger`. `:app` wires them together in `AppContainer`.
+`:feature:monitor` depends only on these interfaces. `:feature:overlay` implements `InterruptionTrigger`, `:feature:scrolldetect` implements `ScrollFeatureDetector`. `:app` wires them together in `AppContainer`.
 
 ## Behaviour
 1. **Usage tracking** — query `UsageEvents` for recent `ACTIVITY_RESUMED` / `ACTIVITY_PAUSED` events to determine the current foreground app. Use `queryAndAggregateUsageStats` (or events) for today's per-app minutes since midnight.
-2. **Monitor service** — foreground service with a persistent low-priority notification ("Breathe In is looking out for you"). On Android 14+, declare `foregroundServiceType="specialUse"` with the required `FOREGROUND_SERVICE_SPECIAL_USE` permission and property. Poll every 3 seconds with a coroutine.
-3. **Session tracking** — a session is continuous time with Instagram (`com.instagram.android`) in the foreground. Leaving Instagram for more than 30 seconds ends the session. When the session reaches the threshold, call `InterruptionTrigger.show()` once.
+2. **Monitor service** — foreground service with a persistent low-priority notification ("Breathe In is looking out for you"). On Android 14+, declare `foregroundServiceType="specialUse"` with the required `FOREGROUND_SERVICE_SPECIAL_USE` permission and property. Poll every second with a coroutine (so short visits to a feed add up accurately).
+3. **Session tracking** — one session per monitored app. For Instagram and YouTube, only time with Reels / Shorts on screen counts (detected by `:feature:scrolldetect`); for TikTok and any other app, time with the app in the foreground counts. Only that time adds up: Reels 5 s → home feed 5 s → Reels again counts as 5 s, not 10. Being away for more than 30 seconds ends the session and resets the total. When the session reaches that app's limit, call `InterruptionTrigger.show()` once.
+   - **Feed detection** — an AccessibilityService limited to Instagram + YouTube looks for known view IDs (`FeatureMarkers`). They're internal to those apps and change with updates: use the debug screen's "Capture view IDs" to find new ones. Window queries run on a background thread (the service shares our UI's main thread).
 4. **Overlay** — full-screen `ComposeView` added via `WindowManager` with `TYPE_APPLICATION_OVERLAY`. The ComposeView must be given a `LifecycleOwner` and `SavedStateRegistryOwner` (overlays have no Activity), otherwise Compose crashes.
-5. **Breathing animation** — a circle expands (breathe in, 4s) and contracts (breathe out, 4s) for 3 cycles, with text "Breathe in" / "Breathe out". Show "Instagram today: X min". Buttons appear after the animation finishes.
+5. **Breathing animation** — a black circle expands (breathe in, 5s), stays at full size (hold, 2s) and contracts (breathe out, 5s), 3 cycles (36s), with text "Breathe in" / "Hold" / "Breathe out". Show "<App> today: X min". The background is see-through: the app behind is blurred (Android 12+ `FLAG_BLUR_BEHIND`, when the device allows cross-window blur) under a light dark tint, or a stronger tint without blur. Buttons appear after the animation finishes. Tapping anywhere outside the circle, at any time, counts as Keep scrolling.
 6. **Outcomes**
    - Keep scrolling → dismiss overlay, reset the session timer (next interruption after another full threshold).
-   - I'm done → dismiss overlay, send the user to the home screen (`Intent.ACTION_MAIN` + `CATEGORY_HOME`). TODO hook for check-in.
-7. **Threshold** — default 10 minutes; debug builds default to 1 minute. Configurable on the debug screen.
+   - I'm done (button reads "Take a break") → dismiss overlay, send the user to the home screen (`Intent.ACTION_MAIN` + `CATEGORY_HOME`). TODO hook for check-in.
+7. **Limits** — set per app on the Monitored apps page. Default 10 minutes (debug builds: 1 minute). Debug builds also offer 10 s and 30 s for quick testing. Instagram, YouTube and TikTok are monitored by default.
 
 ## Permissions
 - `PACKAGE_USAGE_STATS` (Usage Access, user grants in Settings)
 - `SYSTEM_ALERT_WINDOW` (Display over other apps, user grants in Settings)
 - `POST_NOTIFICATIONS` (Android 13+, runtime)
 - `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`
-- Instagram package visibility: add a `<queries>` entry for `com.instagram.android`
+- Accessibility service ("Breathe In feed detection", user enables in Settings > Accessibility). TODO before Play release: prominent disclosure + consent screen, and the Play accessibility declaration.
+- Package visibility: `<queries>` for Instagram, YouTube, TikTok, plus launcher/home intents (to list and name apps)
 If any permission is missing, return the user to onboarding; never crash.
 
 ## Conventions
@@ -77,7 +86,8 @@ If any permission is missing, return the user to onboarding; never crash.
 ## Testing
 - Emulator with a **Google Play** system image so Instagram can be installed.
 - Use the debug screen's "Test overlay" button to check the overlay without waiting.
-- Use the 1-minute debug threshold to test the full mid-scroll interruption.
+- Set a 10 s limit on the Monitored apps page to test the full mid-scroll interruption quickly.
+- Don't use `uiautomator dump` while testing detection: it pauses other accessibility services. Force-stopping Breathe In also turns its accessibility service off.
 
 ## Scaffold build task (do this first)
 When asked to "build the scaffold", build everything in Current scope, in this order, and build the project after each step (`./gradlew assembleDebug` on macOS/Linux, `gradlew.bat assembleDebug` on Windows). Fix every error before moving on.

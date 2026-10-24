@@ -1,10 +1,13 @@
 <resources>
     <string name="onboarding_title">Welcome to Breathe In</string>
-    <string name="onboarding_body">Breathe In gently interrupts long Instagram sessions with a short breathing break. It needs three permissions to do that.</string>
+    <string name="onboarding_body">Breathe In gently interrupts long scrolling sessions (Reels, Shorts, TikTok) with a short breathing break. It needs four permissions to do that.</string>
     <string name="onboarding_usage_title">Usage access</string>
-    <string name="onboarding_usage_description">To know when Instagram is open and how long you\'ve used it today.</string>
+    <string name="onboarding_usage_description">To know which app is open and how long you\'ve used it today.</string>
     <string name="onboarding_overlay_title">Display over other apps</string>
-    <string name="onboarding_overlay_description">To show the breathing break on top of Instagram.</string>
+    <string name="onboarding_overlay_description">To show the breathing break on top of the app you\'re scrolling.</string>
+    <!-- TODO(play-policy): Play requires a prominent disclosure + consent before enabling a non-accessibility AccessibilityService. -->
+    <string name="onboarding_accessibility_title">Feed detection (Accessibility)</string>
+    <string name="onboarding_accessibility_description">To tell Reels and Shorts apart from the rest of Instagram and YouTube. In Settings, open \"Breathe In feed detection\" and turn it on. It only checks which screen is open in those two apps.</string>
     <string name="onboarding_notifications_title">Notifications</string>
     <string name="onboarding_notifications_description">To show that Breathe In is running.</string>
     <string name="onboarding_grant">Grant</string>

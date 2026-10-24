@@ -4,54 +4,67 @@ import com.breathein.core.common.SESSION_GAP_MILLIS
 import com.breathein.core.model.SessionState
 
 /**
- * Times continuous sessions in [targetPackage]. Pure Kotlin: the caller passes the time in.
+ * Times sessions for one monitored app. Pure Kotlin: the caller passes the time in, and whether the
+ * user is "in" the target right now (the app, or its short-form feed).
  *
- * A session starts when the target app is seen in the foreground and ends once it has been out of
- * the foreground for more than [gapMillis]. Shorter trips away don't break the session (and count
- * towards it). The interruption fires once per session, and again only after [onKeepScrolling].
+ * Only time in the target counts: Reels 5 s, home feed 5 s, Reels again = 5 s so far, not 10.
+ * A session ends once the target has been out of view for more than [gapMillis], which resets the
+ * total. The interruption fires once per session, and again only after [onKeepScrolling].
  */
 class SessionTracker(
-    private val targetPackage: String,
+    private val packageName: String,
     private val gapMillis: Long = SESSION_GAP_MILLIS,
 ) {
-    private var sessionStartMillis: Long? = null
+    private var inSession = false
+    private var activeMillis = 0L
+    private var lastTickMillis: Long? = null
+    private var lastTickInTarget = false
     private var lastSeenMillis = 0L
     private var interruptionFired = false
 
-    var state: SessionState = SessionState.Idle
+    /** The session in progress, or null when there is none. */
+    var state: SessionState? = null
         private set
 
     /** Records one poll. Returns true if the interruption should be shown now. */
-    fun onTick(nowMillis: Long, foregroundPackage: String?, thresholdMillis: Long): Boolean {
-        val inTarget = foregroundPackage == targetPackage
+    fun onTick(nowMillis: Long, inTarget: Boolean, thresholdMillis: Long): Boolean {
+        // Time between two polls counts only if the user was in the target at both ends of it.
+        val previousTick = lastTickMillis
+        if (inSession && inTarget && lastTickInTarget && previousTick != null) {
+            activeMillis += nowMillis - previousTick
+        }
+        lastTickMillis = nowMillis
+        lastTickInTarget = inTarget
+
         if (inTarget) {
-            if (sessionStartMillis == null) sessionStartMillis = nowMillis
+            inSession = true
             lastSeenMillis = nowMillis
-        } else if (sessionStartMillis != null && nowMillis - lastSeenMillis > gapMillis) {
+        } else if (inSession && nowMillis - lastSeenMillis > gapMillis) {
             endSession()
         }
 
-        val start = sessionStartMillis ?: return false
-        val elapsed = nowMillis - start
-        val shouldInterrupt = inTarget && !interruptionFired && elapsed >= thresholdMillis
+        if (!inSession) return false
+        val shouldInterrupt = inTarget && !interruptionFired && activeMillis >= thresholdMillis
         if (shouldInterrupt) interruptionFired = true
-        state = SessionState(isActive = true, elapsedMillis = elapsed, interruptionShown = interruptionFired)
+        state = SessionState(packageName, activeMillis, interruptionFired)
         return shouldInterrupt
     }
 
-    /** The user chose to keep going: restart the clock so the next interruption is a full threshold away. */
+    /** The user chose to keep going: start counting again so the next interruption is a full threshold away. */
     fun onKeepScrolling(nowMillis: Long) {
-        if (sessionStartMillis != null) {
-            sessionStartMillis = nowMillis
+        activeMillis = 0L
+        lastTickMillis = nowMillis
+        if (inSession) {
             lastSeenMillis = nowMillis
-            state = SessionState(isActive = true)
+            state = SessionState(packageName)
         }
         interruptionFired = false
     }
 
     fun endSession() {
-        sessionStartMillis = null
+        inSession = false
+        activeMillis = 0L
         interruptionFired = false
-        state = SessionState.Idle
+        state = null
     }
 }

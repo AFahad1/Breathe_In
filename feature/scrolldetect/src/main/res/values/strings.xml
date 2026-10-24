@@ -1,0 +1,4 @@
+<resources>
+    <string name="scroll_detection_label">Breathe In feed detection</string>
+    <string name="scroll_detection_description">Lets Breathe In notice when you are in Instagram Reels or YouTube Shorts so it can offer a breathing break. It only checks which screen is open in those two apps and never reads your messages or other content.</string>
+</resources>

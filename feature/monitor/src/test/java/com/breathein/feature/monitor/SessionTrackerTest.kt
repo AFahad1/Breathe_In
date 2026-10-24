@@ -2,96 +2,114 @@ package com.breathein.feature.monitor
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SessionTrackerTest {
 
-    private val tracker = SessionTracker(targetPackage = TARGET, gapMillis = 30_000)
+    private val tracker = SessionTracker(packageName = "com.instagram.android", gapMillis = 30_000)
 
-    @Test
-    fun `session starts when target app is in foreground`() {
-        assertFalse(tracker.state.isActive)
-
-        tracker.onTick(nowMillis = 1_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD)
-        tracker.onTick(nowMillis = 4_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD)
-
-        assertTrue(tracker.state.isActive)
-        assertEquals(3_000, tracker.state.elapsedMillis)
+    /** Polls once a second from [fromMillis] (inclusive) to [toMillis] (inclusive); true if any poll fired. */
+    private fun poll(fromMillis: Long, toMillis: Long, inTarget: Boolean, thresholdMillis: Long = THRESHOLD): Boolean {
+        var fired = false
+        for (now in fromMillis..toMillis step 1_000) {
+            if (tracker.onTick(now, inTarget, thresholdMillis)) fired = true
+        }
+        return fired
     }
 
     @Test
-    fun `other apps do not start a session`() {
-        tracker.onTick(nowMillis = 1_000, foregroundPackage = OTHER, thresholdMillis = THRESHOLD)
+    fun `session starts when target is in view`() {
+        assertNull(tracker.state)
 
-        assertFalse(tracker.state.isActive)
+        poll(0, 3_000, inTarget = true)
+
+        assertEquals(3_000L, tracker.state?.elapsedMillis)
     }
 
     @Test
-    fun `short trip away keeps the session`() {
-        tracker.onTick(nowMillis = 0, foregroundPackage = TARGET, thresholdMillis = THRESHOLD)
-        tracker.onTick(nowMillis = 30_000, foregroundPackage = OTHER, thresholdMillis = THRESHOLD)
+    fun `nothing starts while target is out of view`() {
+        poll(0, 5_000, inTarget = false)
 
-        assertTrue(tracker.state.isActive)
+        assertNull(tracker.state)
+    }
+
+    @Test
+    fun `time away from the target does not count`() {
+        // Reels 5 s, home feed 5 s, back to Reels: only Reels time adds up.
+        poll(0, 5_000, inTarget = true)
+        poll(6_000, 10_000, inTarget = false)
+        poll(11_000, 13_000, inTarget = true)
+
+        assertEquals(7_000L, tracker.state?.elapsedMillis)
+    }
+
+    @Test
+    fun `interrupts after 10 seconds of total feed time split across visits`() {
+        val limit = 10_000L
+        assertFalse(poll(0, 5_000, inTarget = true, thresholdMillis = limit))
+        assertFalse(poll(6_000, 10_000, inTarget = false, thresholdMillis = limit))
+        assertFalse(poll(11_000, 15_000, inTarget = true, thresholdMillis = limit))
+        assertTrue(poll(16_000, 16_000, inTarget = true, thresholdMillis = limit))
+    }
+
+    @Test
+    fun `short break keeps the session`() {
+        poll(0, 5_000, inTarget = true)
+        poll(6_000, 30_000, inTarget = false)
+
+        assertNotNull(tracker.state)
     }
 
     @Test
     fun `session ends after more than 30 seconds away`() {
-        tracker.onTick(nowMillis = 0, foregroundPackage = TARGET, thresholdMillis = THRESHOLD)
-        tracker.onTick(nowMillis = 30_001, foregroundPackage = OTHER, thresholdMillis = THRESHOLD)
+        poll(0, 5_000, inTarget = true)
+        poll(6_000, 36_000, inTarget = false)
 
-        assertFalse(tracker.state.isActive)
+        assertNull(tracker.state)
 
-        // Coming back starts a fresh session.
-        tracker.onTick(nowMillis = 40_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD)
-        assertEquals(0, tracker.state.elapsedMillis)
+        // Coming back starts a fresh session from zero.
+        poll(40_000, 40_000, inTarget = true)
+        assertEquals(0L, tracker.state?.elapsedMillis)
     }
 
     @Test
     fun `fires once when threshold is reached`() {
-        assertFalse(tracker.onTick(nowMillis = 0, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
-        assertFalse(tracker.onTick(nowMillis = 57_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
-        assertTrue(tracker.onTick(nowMillis = 60_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
-        assertFalse(tracker.onTick(nowMillis = 63_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
-        assertFalse(tracker.onTick(nowMillis = 600_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
+        assertFalse(poll(0, 59_000, inTarget = true))
+        assertTrue(poll(60_000, 60_000, inTarget = true))
+        assertFalse(poll(61_000, 600_000, inTarget = true))
     }
 
     @Test
-    fun `does not fire while another app is in front`() {
-        tracker.onTick(nowMillis = 0, foregroundPackage = TARGET, thresholdMillis = THRESHOLD)
-        tracker.onTick(nowMillis = 50_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD)
-
-        assertFalse(tracker.onTick(nowMillis = 61_000, foregroundPackage = OTHER, thresholdMillis = THRESHOLD))
-        assertTrue(tracker.onTick(nowMillis = 64_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
+    fun `fires after 10 seconds with a 10 second limit`() {
+        assertFalse(poll(0, 9_000, inTarget = true, thresholdMillis = 10_000))
+        assertTrue(poll(10_000, 10_000, inTarget = true, thresholdMillis = 10_000))
     }
 
     @Test
     fun `keep scrolling resets the timer for another full threshold`() {
-        tracker.onTick(nowMillis = 0, foregroundPackage = TARGET, thresholdMillis = THRESHOLD)
-        assertTrue(tracker.onTick(nowMillis = 60_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
+        assertTrue(poll(0, 60_000, inTarget = true))
 
         tracker.onKeepScrolling(nowMillis = 90_000)
 
-        assertTrue(tracker.state.isActive)
-        assertFalse(tracker.onTick(nowMillis = 149_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
-        assertTrue(tracker.onTick(nowMillis = 150_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
+        assertNotNull(tracker.state)
+        assertFalse(poll(91_000, 149_000, inTarget = true))
+        assertTrue(poll(150_000, 150_000, inTarget = true))
     }
 
     @Test
     fun `ending the session allows a new interruption in the next session`() {
-        tracker.onTick(nowMillis = 0, foregroundPackage = TARGET, thresholdMillis = THRESHOLD)
-        assertTrue(tracker.onTick(nowMillis = 60_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
+        assertTrue(poll(0, 60_000, inTarget = true))
 
         tracker.endSession()
 
-        assertFalse(tracker.state.isActive)
-        tracker.onTick(nowMillis = 100_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD)
-        assertTrue(tracker.onTick(nowMillis = 160_000, foregroundPackage = TARGET, thresholdMillis = THRESHOLD))
+        assertNull(tracker.state)
+        assertTrue(poll(100_000, 160_000, inTarget = true))
     }
 
     private companion object {
-        const val TARGET = "com.instagram.android"
-        const val OTHER = "com.android.launcher"
         const val THRESHOLD = 60_000L
     }
 }

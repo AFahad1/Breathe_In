@@ -4,14 +4,15 @@ import android.content.Context
 import android.os.SystemClock
 import com.breathein.core.common.CheckInLauncher
 import com.breathein.core.common.EventLog
-import com.breathein.core.common.INSTAGRAM_LABEL
-import com.breathein.core.common.INSTAGRAM_PACKAGE
 import com.breathein.core.common.InterruptionTrigger
 import com.breathein.core.common.POLL_INTERVAL_MILLIS
+import com.breathein.core.common.ScrollFeatureDetector
+import com.breathein.core.common.ShortFormApps
 import com.breathein.core.common.UsageRepository
 import com.breathein.core.common.goToHomeScreen
 import com.breathein.core.model.InterruptionOutcome
 import com.breathein.core.model.InterruptionRequest
+import com.breathein.core.model.MonitoredApp
 import com.breathein.core.model.SessionState
 import com.breathein.core.permissions.PermissionChecker
 import com.breathein.core.settings.SettingsRepository
@@ -28,12 +29,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The polling loop: every few seconds, checks the foreground app, feeds [SessionTracker] and fires
- * the interruption. Runs inside [MonitorService]. Tracker state is only touched on the main thread.
+ * The polling loop: every few seconds, works out which monitored app (or feed) is in view, feeds one
+ * [SessionTracker] per app and fires the interruption. Runs inside [MonitorService].
+ * Tracker state is only touched on the main thread.
  */
 class SessionMonitor(
     context: Context,
     private val usageRepository: UsageRepository,
+    private val scrollFeatureDetector: ScrollFeatureDetector,
     private val interruptionTrigger: InterruptionTrigger,
     private val settingsRepository: SettingsRepository,
     private val permissionChecker: PermissionChecker,
@@ -42,14 +45,14 @@ class SessionMonitor(
     private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) {
     private val appContext = context.applicationContext
-    private val tracker = SessionTracker(INSTAGRAM_PACKAGE)
+    private val trackers = mutableMapOf<String, SessionTracker>()
     private var loop: Job? = null
 
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
-    private val _sessionState = MutableStateFlow(SessionState.Idle)
-    val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+    private val _sessions = MutableStateFlow<List<SessionState>>(emptyList())
+    val sessions: StateFlow<List<SessionState>> = _sessions.asStateFlow()
 
     /** Starts polling in [scope] (which must use the main dispatcher). [onPermissionLost] is called if access is revoked. */
     fun start(scope: CoroutineScope, onPermissionLost: () -> Unit) {
@@ -70,41 +73,59 @@ class SessionMonitor(
     fun stop() {
         loop?.cancel()
         loop = null
-        tracker.endSession()
-        _sessionState.value = tracker.state
+        trackers.clear()
+        publishSessions()
         _isRunning.value = false
     }
 
     private suspend fun tick() {
         val foreground = withContext(Dispatchers.IO) { usageRepository.currentForegroundPackage() }
-        val thresholdMillis = settingsRepository.thresholdMinutes.first() * MILLIS_PER_MINUTE
-        val shouldInterrupt = tracker.onTick(clock(), foreground, thresholdMillis)
-        _sessionState.value = tracker.state
-        if (shouldInterrupt) showInterruption()
+        val monitoredApps = settingsRepository.monitoredApps.first()
+        val now = clock()
+
+        trackers.keys.retainAll(monitoredApps.mapTo(HashSet()) { it.packageName })
+        var toInterrupt: MonitoredApp? = null
+        for (app in monitoredApps) {
+            val tracker = trackers.getOrPut(app.packageName) { SessionTracker(app.packageName) }
+            val fired = tracker.onTick(now, isInTarget(app.packageName, foreground), app.limitSeconds * 1_000L)
+            if (fired && toInterrupt == null) toInterrupt = app
+        }
+        publishSessions()
+        toInterrupt?.let { showInterruption(it.packageName) }
     }
 
-    private suspend fun showInterruption() {
-        val todayMinutes = withContext(Dispatchers.IO) { usageRepository.todayMinutesFor(INSTAGRAM_PACKAGE) }
-        val request = InterruptionRequest(INSTAGRAM_PACKAGE, INSTAGRAM_LABEL, todayMinutes)
+    /** In the app, and (for Instagram/YouTube) in its short-form feed rather than elsewhere in the app. */
+    private fun isInTarget(packageName: String, foreground: String?): Boolean {
+        if (foreground != packageName) return false
+        val requiredFeature = ShortFormApps.requiredFeature(packageName) ?: return true
+        return scrollFeatureDetector.activeFeature.value == requiredFeature
+    }
+
+    private suspend fun showInterruption(packageName: String) {
+        val (label, todayMinutes) = withContext(Dispatchers.IO) {
+            usageRepository.labelFor(packageName) to usageRepository.todayMinutesFor(packageName)
+        }
+        val request = InterruptionRequest(packageName, label, todayMinutes)
         eventLog.interruptionShown(request)
-        interruptionTrigger.show(request, ::onOutcome)
+        interruptionTrigger.show(request) { outcome -> onOutcome(packageName, outcome) }
     }
 
-    private fun onOutcome(outcome: InterruptionOutcome) {
+    private fun onOutcome(packageName: String, outcome: InterruptionOutcome) {
         eventLog.interruptionFinished(outcome)
+        val tracker = trackers[packageName]
         when (outcome) {
-            InterruptionOutcome.KeepScrolling -> tracker.onKeepScrolling(clock())
+            InterruptionOutcome.KeepScrolling -> tracker?.onKeepScrolling(clock())
             InterruptionOutcome.ImDone -> {
-                tracker.endSession()
+                tracker?.endSession()
                 appContext.goToHomeScreen()
                 // TODO(check-in): currently a no-op; plug the check-in in via AppContainer.
                 checkInLauncher.launch()
             }
         }
-        _sessionState.value = tracker.state
+        publishSessions()
     }
 
-    private companion object {
-        const val MILLIS_PER_MINUTE = 60_000L
+    private fun publishSessions() {
+        _sessions.value = trackers.values.mapNotNull { it.state }
     }
 }

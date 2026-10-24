@@ -23,7 +23,7 @@ class ServiceMonitorController(
     private val serviceIntent get() = Intent(appContext, MonitorService::class.java)
 
     override val isRunning: StateFlow<Boolean> get() = sessionMonitor.isRunning
-    override val sessionState: StateFlow<SessionState> get() = sessionMonitor.sessionState
+    override val sessions: StateFlow<List<SessionState>> get() = sessionMonitor.sessions
 
     override fun start() {
         scope.launch { settingsRepository.setMonitoringEnabled(true) }

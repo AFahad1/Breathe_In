@@ -3,6 +3,7 @@
     <string name="debug_permission_usage">Usage access</string>
     <string name="debug_permission_overlay">Display over other apps</string>
     <string name="debug_permission_notifications">Notifications</string>
+    <string name="debug_permission_accessibility">Feed detection (Accessibility)</string>
     <string name="debug_yes">✓ Granted</string>
     <string name="debug_no">✗ Missing</string>
 
@@ -12,13 +13,24 @@
     <string name="debug_stopped">○ Stopped</string>
     <string name="debug_foreground_app">Foreground app: %1$s</string>
     <string name="debug_unknown">unknown</string>
-    <string name="debug_session_active">Instagram session: %1$d s</string>
-    <string name="debug_session_idle">No Instagram session</string>
-    <string name="debug_interruption_shown">Interruption shown this session</string>
+    <string name="debug_session_active">%1$s session: %2$d s</string>
+    <string name="debug_session_idle">No active session</string>
+    <string name="debug_interruption_shown">interrupted</string>
     <string name="debug_start_monitoring">Start monitoring</string>
     <string name="debug_stop_monitoring">Stop monitoring</string>
 
-    <string name="debug_threshold">Interrupt after %1$d min</string>
+    <string name="debug_monitored_apps">Monitored apps</string>
+    <string name="debug_monitored_apps_count">%1$d apps monitored</string>
+    <string name="debug_edit_monitored_apps">Choose apps and limits</string>
+
+    <string name="debug_detection">Feed detection</string>
+    <string name="debug_detection_service">Accessibility service</string>
+    <string name="debug_connected">● Connected</string>
+    <string name="debug_not_connected">○ Off</string>
+    <string name="debug_detected_feature">Detected feed: %1$s</string>
+    <string name="debug_none">none</string>
+    <string name="debug_capture_view_ids">Capture view IDs in 5 s (open Reels or Shorts)</string>
+    <string name="debug_captured_from">%1$s: %2$d view IDs</string>
 
     <string name="debug_overlay">Overlay</string>
     <string name="debug_test_overlay">Test overlay</string>

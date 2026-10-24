@@ -1,7 +1,9 @@
 package com.breathein.feature.usage
 
 import android.content.Context
+import android.content.Intent
 import com.breathein.core.common.UsageRepository
+import com.breathein.core.model.AppInfo
 import com.breathein.core.model.AppUsage
 import java.util.Calendar
 
@@ -34,6 +36,18 @@ class UsageStatsUsageRepository(context: Context) : UsageRepository {
 
     override fun todayMinutesFor(packageName: String): Int =
         ((todayMillisByPackage()[packageName] ?: 0L) / MILLIS_PER_MINUTE).toInt()
+
+    override fun launchableApps(): List<AppInfo> {
+        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        return appContext.packageManager.queryIntentActivities(launcherIntent, 0)
+            .map { it.activityInfo.packageName }
+            .distinct()
+            .filter { it != appContext.packageName }
+            .map { AppInfo(it, labels.labelFor(it)) }
+            .sortedBy { it.label.lowercase() }
+    }
+
+    override fun labelFor(packageName: String): String = labels.labelFor(packageName)
 
     private fun todayMillisByPackage(): Map<String, Long> {
         val now = System.currentTimeMillis()

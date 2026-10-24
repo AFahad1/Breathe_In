@@ -23,6 +23,7 @@ android {
 }
 
 dependencies {
+    api(project(":core:common"))
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
 }

@@ -1,0 +1,12 @@
+<resources>
+    <string name="apps_done">← Done</string>
+    <string name="apps_title">Monitored apps</string>
+    <string name="apps_body">Pick the apps where Breathe In should step in, and how long you can scroll before a breathing break.</string>
+    <string name="apps_short_form">Short-form feeds</string>
+    <string name="apps_other">Other apps</string>
+    <string name="apps_feed_title">%1$s %2$s</string>
+    <string name="apps_feed_only">Only time in this feed counts</string>
+    <string name="apps_whole_app">Time anywhere in the app counts</string>
+    <string name="apps_not_installed">Not installed</string>
+    <string name="apps_loading">Loading apps…</string>
+</resources>

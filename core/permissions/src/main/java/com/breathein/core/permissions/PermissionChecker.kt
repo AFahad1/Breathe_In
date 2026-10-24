@@ -2,6 +2,7 @@ package com.breathein.core.permissions
 
 import android.Manifest
 import android.app.AppOpsManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -38,5 +39,14 @@ class PermissionChecker(context: Context) {
             ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
 
-    fun allGranted(): Boolean = hasUsageAccess() && canDrawOverlays() && hasNotificationPermission()
+    /** True when the user has switched on our accessibility service (needed to detect Reels and Shorts). */
+    fun hasAccessibilityService(): Boolean {
+        // Read the system setting directly: AccessibilityManager's list in our own process can lag behind it.
+        val enabled = Settings.Secure.getString(appContext.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            ?: return false
+        return enabled.split(':').any { ComponentName.unflattenFromString(it)?.packageName == appContext.packageName }
+    }
+
+    fun allGranted(): Boolean =
+        hasUsageAccess() && canDrawOverlays() && hasNotificationPermission() && hasAccessibilityService()
 }

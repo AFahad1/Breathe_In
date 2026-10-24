@@ -14,6 +14,8 @@
 
     <queries>
         <package android:name="com.instagram.android" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.zhiliaoapp.musically" />
         <!-- Lets the debug screen resolve app names for launchable apps and the home screen. -->
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -52,6 +54,20 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Watches which app is in the foreground so it can show a mindful breathing break during long social media sessions." />
+        </service>
+
+        <!-- Detects Instagram Reels / YouTube Shorts on screen. The user enables it in Accessibility settings. -->
+        <service
+            android:name="com.breathein.feature.scrolldetect.ScrollDetectionService"
+            android:exported="false"
+            android:label="@string/scroll_detection_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/scroll_detection_service" />
         </service>
     </application>
 

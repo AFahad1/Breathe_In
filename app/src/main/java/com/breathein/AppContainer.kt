@@ -7,12 +7,14 @@ import com.breathein.core.common.InterruptionTrigger
 import com.breathein.core.common.MonitorController
 import com.breathein.core.common.NoOpCheckInLauncher
 import com.breathein.core.common.NoOpEventLog
+import com.breathein.core.common.ScrollFeatureDetector
 import com.breathein.core.common.UsageRepository
 import com.breathein.core.permissions.PermissionChecker
 import com.breathein.core.settings.SettingsRepository
 import com.breathein.feature.monitor.ServiceMonitorController
 import com.breathein.feature.monitor.SessionMonitor
 import com.breathein.feature.overlay.OverlayInterruptionTrigger
+import com.breathein.feature.scrolldetect.AccessibilityScrollFeatureDetector
 import com.breathein.feature.usage.UsageStatsUsageRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +31,9 @@ class AppContainer(context: Context) {
     val usageRepository: UsageRepository = UsageStatsUsageRepository(appContext)
     val interruptionTrigger: InterruptionTrigger = OverlayInterruptionTrigger(appContext)
 
+    /** Concrete type so ScrollDetectionService can feed it; everyone else sees [ScrollFeatureDetector]. */
+    val scrollFeatureDetector = AccessibilityScrollFeatureDetector()
+
     // TODO(check-in): replace with the real check-in once it exists.
     private val checkInLauncher: CheckInLauncher = NoOpCheckInLauncher
 
@@ -38,6 +43,7 @@ class AppContainer(context: Context) {
     val sessionMonitor = SessionMonitor(
         context = appContext,
         usageRepository = usageRepository,
+        scrollFeatureDetector = scrollFeatureDetector,
         interruptionTrigger = interruptionTrigger,
         settingsRepository = settingsRepository,
         permissionChecker = permissionChecker,

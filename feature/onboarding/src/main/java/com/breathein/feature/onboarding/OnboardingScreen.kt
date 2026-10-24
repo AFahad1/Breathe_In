@@ -77,6 +77,12 @@ fun OnboardingScreen(
             onGrant = { context.openSettings(PermissionIntents.overlay(context)) },
         )
         PermissionRow(
+            title = stringResource(R.string.onboarding_accessibility_title),
+            description = stringResource(R.string.onboarding_accessibility_description),
+            granted = status.accessibility,
+            onGrant = { context.openSettings(PermissionIntents.accessibility()) },
+        )
+        PermissionRow(
             title = stringResource(R.string.onboarding_notifications_title),
             description = stringResource(R.string.onboarding_notifications_description),
             granted = status.notifications,

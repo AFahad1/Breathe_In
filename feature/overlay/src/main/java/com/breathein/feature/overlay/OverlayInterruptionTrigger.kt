@@ -34,12 +34,13 @@ class OverlayInterruptionTrigger(context: Context) : InterruptionTrigger {
         }
 
         val owner = OverlayLifecycleOwner().apply { create() }
+        val blurBehind = canBlurBehind()
         var outcomeDelivered = false
         val view = ComposeView(appContext).apply {
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
             setContent {
-                BreathingOverlay(request = request) { outcome ->
+                BreathingOverlay(request = request, backgroundBlurred = blurBehind) { outcome ->
                     if (!outcomeDelivered) {
                         outcomeDelivered = true
                         // Posted so the window isn't torn down while it is still dispatching the click.
@@ -53,7 +54,7 @@ class OverlayInterruptionTrigger(context: Context) : InterruptionTrigger {
         }
 
         try {
-            windowManager.addView(view, overlayLayoutParams())
+            windowManager.addView(view, overlayLayoutParams(blurBehind))
         } catch (e: RuntimeException) {
             // BadTokenException / SecurityException if the permission was revoked a moment ago.
             Log.e(TAG, "Could not add overlay", e)
@@ -79,7 +80,11 @@ class OverlayInterruptionTrigger(context: Context) : InterruptionTrigger {
         lifecycleOwner = null
     }
 
-    private fun overlayLayoutParams() = WindowManager.LayoutParams(
+    /** Blurring the app behind needs Android 12+ and can be switched off (some devices, battery saver). */
+    private fun canBlurBehind(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && windowManager.isCrossWindowBlurEnabled
+
+    private fun overlayLayoutParams(blurBehind: Boolean) = WindowManager.LayoutParams(
         WindowManager.LayoutParams.MATCH_PARENT,
         WindowManager.LayoutParams.MATCH_PARENT,
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -87,6 +92,10 @@ class OverlayInterruptionTrigger(context: Context) : InterruptionTrigger {
         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
         PixelFormat.TRANSLUCENT,
     ).apply {
+        if (blurBehind && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags = flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+            blurBehindRadius = BLUR_RADIUS_PX
+        }
         // Draw behind the status and navigation bars; the Compose content pads itself for them.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             fitInsetsTypes = 0
@@ -102,5 +111,6 @@ class OverlayInterruptionTrigger(context: Context) : InterruptionTrigger {
 
     private companion object {
         const val TAG = "OverlayTrigger"
+        const val BLUR_RADIUS_PX = 80
     }
 }

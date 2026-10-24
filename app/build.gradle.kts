@@ -28,6 +28,8 @@ dependencies {
     implementation(project(":core:permissions"))
     implementation(project(":core:settings"))
     implementation(project(":feature:usage"))
+    implementation(project(":feature:scrolldetect"))
+    implementation(project(":feature:apps"))
     implementation(project(":feature:monitor"))
     implementation(project(":feature:overlay"))
     implementation(project(":feature:onboarding"))

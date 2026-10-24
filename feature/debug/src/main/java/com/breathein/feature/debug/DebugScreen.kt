@@ -20,11 +20,11 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.breathein.core.common.INSTAGRAM_LABEL
 import com.breathein.core.common.INSTAGRAM_PACKAGE
 import com.breathein.core.common.InterruptionTrigger
 import com.breathein.core.common.MonitorController
 import com.breathein.core.common.POLL_INTERVAL_MILLIS
+import com.breathein.core.common.ScrollFeatureDetector
 import com.breathein.core.common.UsageRepository
 import com.breathein.core.common.goToHomeScreen
 import com.breathein.core.model.AppUsage
@@ -37,14 +37,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Developer screen for checking that permissions, usage data, monitoring and the overlay all work. */
+/** Developer screen for checking that permissions, usage data, detection, monitoring and the overlay all work. */
 @Composable
 fun DebugScreen(
     permissionChecker: PermissionChecker,
     usageRepository: UsageRepository,
     settingsRepository: SettingsRepository,
+    scrollFeatureDetector: ScrollFeatureDetector,
     monitorController: MonitorController,
     interruptionTrigger: InterruptionTrigger,
+    onOpenMonitoredApps: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -52,9 +54,11 @@ fun DebugScreen(
     val scope = rememberCoroutineScope()
 
     val isMonitoring by monitorController.isRunning.collectAsStateWithLifecycle()
-    val session by monitorController.sessionState.collectAsStateWithLifecycle()
-    val thresholdMinutes by settingsRepository.thresholdMinutes
-        .collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_THRESHOLD_MINUTES)
+    val sessions by monitorController.sessions.collectAsStateWithLifecycle()
+    val monitoredApps by settingsRepository.monitoredApps.collectAsStateWithLifecycle(initialValue = emptyList())
+    val detectorConnected by scrollFeatureDetector.isConnected.collectAsStateWithLifecycle()
+    val activeFeature by scrollFeatureDetector.activeFeature.collectAsStateWithLifecycle()
+    val viewIdCapture by scrollFeatureDetector.lastViewIdCapture.collectAsStateWithLifecycle()
 
     var permissions by remember { mutableStateOf(PermissionSnapshot.from(permissionChecker)) }
     var foregroundPackage by remember { mutableStateOf<String?>(null) }
@@ -67,10 +71,19 @@ fun DebugScreen(
     fun testOverlay(delayMillis: Long) {
         scope.launch {
             delay(delayMillis)
-            val minutes = withContext(Dispatchers.IO) { usageRepository.todayMinutesFor(INSTAGRAM_PACKAGE) }
-            interruptionTrigger.show(InterruptionRequest(INSTAGRAM_PACKAGE, INSTAGRAM_LABEL, minutes)) { outcome ->
+            val (label, minutes) = withContext(Dispatchers.IO) {
+                usageRepository.labelFor(INSTAGRAM_PACKAGE) to usageRepository.todayMinutesFor(INSTAGRAM_PACKAGE)
+            }
+            interruptionTrigger.show(InterruptionRequest(INSTAGRAM_PACKAGE, label, minutes)) { outcome ->
                 if (outcome == InterruptionOutcome.ImDone) context.goToHomeScreen()
             }
+        }
+    }
+
+    fun captureViewIds() {
+        scope.launch {
+            delay(CAPTURE_DELAY_MILLIS)
+            scrollFeatureDetector.requestViewIdCapture()
         }
     }
 
@@ -98,16 +111,20 @@ fun DebugScreen(
         item {
             MonitoringSection(
                 isMonitoring = isMonitoring,
-                session = session,
+                sessions = sessions,
                 foregroundPackage = foregroundPackage,
+                labelFor = usageRepository::labelFor,
                 onStart = monitorController::start,
                 onStop = monitorController::stop,
             )
         }
+        item { MonitoredAppsSection(monitoredAppCount = monitoredApps.size, onOpen = onOpenMonitoredApps) }
         item {
-            ThresholdSection(
-                thresholdMinutes = thresholdMinutes,
-                onThresholdChange = { minutes -> scope.launch { settingsRepository.setThresholdMinutes(minutes) } },
+            DetectionSection(
+                connected = detectorConnected,
+                activeFeature = activeFeature,
+                capture = viewIdCapture,
+                onCapture = ::captureViewIds,
             )
         }
         item { OverlayTestSection(onTestNow = { testOverlay(0) }, onTestDelayed = { testOverlay(TEST_DELAY_MILLIS) }) }
@@ -118,3 +135,4 @@ fun DebugScreen(
 
 private const val TOP_APPS = 10
 private const val TEST_DELAY_MILLIS = 5_000L
+private const val CAPTURE_DELAY_MILLIS = 5_000L
