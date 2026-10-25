@@ -74,7 +74,8 @@ fun DebugScreen(
             val (label, minutes) = withContext(Dispatchers.IO) {
                 usageRepository.labelFor(INSTAGRAM_PACKAGE) to usageRepository.todayMinutesFor(INSTAGRAM_PACKAGE)
             }
-            interruptionTrigger.show(InterruptionRequest(INSTAGRAM_PACKAGE, label, minutes)) { outcome ->
+            val request = InterruptionRequest(INSTAGRAM_PACKAGE, label, minutes, feedName = "Reels", scrolledSeconds = 120)
+            interruptionTrigger.show(request) { outcome ->
                 if (outcome == InterruptionOutcome.ImDone) context.goToHomeScreen()
             }
         }

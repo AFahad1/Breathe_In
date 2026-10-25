@@ -1,4 +1,6 @@
 <resources>
-    <!-- Window theme only; the UI itself is themed in Compose (BreatheInTheme). -->
-    <style name="Theme.BreatheIn" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Window theme only; the UI itself is themed in Compose (BreatheInTheme). Always dark. -->
+    <style name="Theme.BreatheIn" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+    </style>
 </resources>

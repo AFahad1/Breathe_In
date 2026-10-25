@@ -1,4 +1,4 @@
-package com.breathein.feature.apps
+package com.breathein.core.common
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

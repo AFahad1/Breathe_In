@@ -10,7 +10,7 @@ Built: app shell, permissions, usage tracking, per-app session monitoring, Reels
 Not yet: check-in, event log database, notification mode, visual design. Leave clear TODOs and empty interfaces where these will plug in.
 
 ## Tech stack
-- Kotlin, Jetpack Compose, Material 3 (default theme for now)
+- Kotlin, Jetpack Compose, Material 3 with a custom always-dark theme (`BreatheInTheme` in :app): near-black surfaces, white as the only accent, rounded shapes, light-weight headlines
 - Min SDK 26, target/compile latest stable SDK
 - Gradle Kotlin DSL with a version catalog (`gradle/libs.versions.toml`)
 - No DI framework: manual dependency injection via a simple `AppContainer` in the app module
@@ -30,8 +30,9 @@ Modular so two developers can work in parallel without touching each other's fil
 :feature:monitor      Foreground service + SessionTracker (one per monitored app; times continuous sessions, fires interruptions)
 :feature:overlay      Overlay implementation: WindowManager + ComposeView + breathing animation
 :feature:apps         Monitored apps page: pick apps and a limit for each
+:feature:home         Home screen (start screen): today's minutes in monitored apps, monitoring on/off, app list
 :feature:onboarding   Permission onboarding screen
-:feature:debug        Debug screen: permission status, today's per-app usage, live sessions, detected feed, view-ID capture, "test overlay" button
+:feature:debug        Debug screen (reached from "Developer tools" on Home, debug builds only): permission status, today's per-app usage, live sessions, detected feed, view-ID capture, "test overlay" button
 ```
 
 ## Contracts (in :core:common)
@@ -57,7 +58,7 @@ Modular so two developers can work in parallel without touching each other's fil
 3. **Session tracking** — one session per monitored app. For Instagram and YouTube, only time with Reels / Shorts on screen counts (detected by `:feature:scrolldetect`); for TikTok and any other app, time with the app in the foreground counts. Only that time adds up: Reels 5 s → home feed 5 s → Reels again counts as 5 s, not 10. Being away for more than 30 seconds ends the session and resets the total. When the session reaches that app's limit, call `InterruptionTrigger.show()` once.
    - **Feed detection** — an AccessibilityService limited to Instagram + YouTube looks for known view IDs (`FeatureMarkers`). They're internal to those apps and change with updates: use the debug screen's "Capture view IDs" to find new ones. Window queries run on a background thread (the service shares our UI's main thread).
 4. **Overlay** — full-screen `ComposeView` added via `WindowManager` with `TYPE_APPLICATION_OVERLAY`. The ComposeView must be given a `LifecycleOwner` and `SavedStateRegistryOwner` (overlays have no Activity), otherwise Compose crashes.
-5. **Breathing animation** — a black circle expands (breathe in, 5s), stays at full size (hold, 2s) and contracts (breathe out, 5s), 3 cycles (36s), with text "Breathe in" / "Hold" / "Breathe out". Show "<App> today: X min". The background is see-through: the app behind is blurred (Android 12+ `FLAG_BLUR_BEHIND`, when the device allows cross-window blur) under a light dark tint, or a stronger tint without blur. Buttons appear after the animation finishes. Tapping anywhere outside the circle, at any time, counts as Keep scrolling.
+5. **Breathing animation** — first a 5-second prompt ("You've been on Instagram Reels for 2 min. Take a breathing break in…" with a 5-4-3-2-1 countdown in the circle) so the break isn't abrupt; then a black circle expands (breathe in, 5s), stays at full size (hold, 2s) and contracts (breathe out, 5s), 3 cycles (36s), with text "Breathe in" / "Hold" / "Breathe out". Show "<App> today: X min". The background is see-through: the app behind is blurred (Android 12+ `FLAG_BLUR_BEHIND`, when the device allows cross-window blur) under a light dark tint, or a stronger tint without blur. Buttons appear after the animation finishes. Tapping anywhere outside the circle, at any time, counts as Keep scrolling.
 6. **Outcomes**
    - Keep scrolling → dismiss overlay, reset the session timer (next interruption after another full threshold).
    - I'm done (button reads "Take a break") → dismiss overlay, send the user to the home screen (`Intent.ACTION_MAIN` + `CATEGORY_HOME`). TODO hook for check-in.

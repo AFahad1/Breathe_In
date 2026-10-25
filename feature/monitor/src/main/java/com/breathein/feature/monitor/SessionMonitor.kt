@@ -105,7 +105,14 @@ class SessionMonitor(
         val (label, todayMinutes) = withContext(Dispatchers.IO) {
             usageRepository.labelFor(packageName) to usageRepository.todayMinutesFor(packageName)
         }
-        val request = InterruptionRequest(packageName, label, todayMinutes)
+        val shortForm = ShortFormApps.find(packageName)
+        val request = InterruptionRequest(
+            packageName = packageName,
+            appLabel = shortForm?.label ?: label,
+            todayMinutes = todayMinutes,
+            feedName = shortForm?.feature?.let { shortForm.feedName },
+            scrolledSeconds = ((trackers[packageName]?.state?.elapsedMillis ?: 0L) / 1_000).toInt(),
+        )
         eventLog.interruptionShown(request)
         interruptionTrigger.show(request) { outcome -> onOutcome(packageName, outcome) }
     }

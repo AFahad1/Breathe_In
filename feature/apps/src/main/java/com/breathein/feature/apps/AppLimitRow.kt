@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.breathein.core.common.formatLimit
 
 /** One app: on/off switch plus, when on, how long a session may run before the breathing break. */
 @Composable

@@ -17,6 +17,10 @@ android {
         versionName = "0.1.0"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -30,6 +34,7 @@ dependencies {
     implementation(project(":feature:usage"))
     implementation(project(":feature:scrolldetect"))
     implementation(project(":feature:apps"))
+    implementation(project(":feature:home"))
     implementation(project(":feature:monitor"))
     implementation(project(":feature:overlay"))
     implementation(project(":feature:onboarding"))
