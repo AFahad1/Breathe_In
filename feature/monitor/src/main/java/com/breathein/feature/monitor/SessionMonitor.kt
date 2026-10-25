@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.SystemClock
 import com.breathein.core.common.CheckInLauncher
 import com.breathein.core.common.EventLog
+import com.breathein.core.common.FeedInsightsRepository
 import com.breathein.core.common.InterruptionTrigger
 import com.breathein.core.common.POLL_INTERVAL_MILLIS
 import com.breathein.core.common.ScrollFeatureDetector
@@ -42,6 +43,7 @@ class SessionMonitor(
     private val permissionChecker: PermissionChecker,
     private val checkInLauncher: CheckInLauncher,
     private val eventLog: EventLog,
+    private val feedInsights: FeedInsightsRepository? = null,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) {
     private val appContext = context.applicationContext
@@ -106,12 +108,14 @@ class SessionMonitor(
             usageRepository.labelFor(packageName) to usageRepository.todayMinutesFor(packageName)
         }
         val shortForm = ShortFormApps.find(packageName)
+        val scrolledMillis = trackers[packageName]?.state?.elapsedMillis ?: 0L
         val request = InterruptionRequest(
             packageName = packageName,
             appLabel = shortForm?.label ?: label,
             todayMinutes = todayMinutes,
             feedName = shortForm?.feature?.let { shortForm.feedName },
-            scrolledSeconds = ((trackers[packageName]?.state?.elapsedMillis ?: 0L) / 1_000).toInt(),
+            scrolledSeconds = (scrolledMillis / 1_000).toInt(),
+            topCategory = feedInsights?.topCategorySince(packageName, System.currentTimeMillis() - scrolledMillis),
         )
         eventLog.interruptionShown(request)
         interruptionTrigger.show(request) { outcome -> onOutcome(packageName, outcome) }

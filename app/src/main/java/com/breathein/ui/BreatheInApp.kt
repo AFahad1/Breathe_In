@@ -15,9 +15,11 @@ import com.breathein.BuildConfig
 import com.breathein.feature.apps.MonitoredAppsScreen
 import com.breathein.feature.debug.DebugScreen
 import com.breathein.feature.home.HomeScreen
+import com.breathein.feature.insights.FeedInsightsCard
+import com.breathein.feature.insights.FeedInsightsScreen
 import com.breathein.feature.onboarding.OnboardingScreen
 
-private enum class Screen { Onboarding, Home, MonitoredApps, Debug }
+private enum class Screen { Onboarding, Home, MonitoredApps, FeedInsights, Debug }
 
 /** Top-level navigation: onboarding while any permission is missing, otherwise the home screen. */
 @Composable
@@ -33,7 +35,7 @@ fun BreatheInApp(container: AppContainer) {
         onPauseOrDispose { }
     }
 
-    BackHandler(enabled = screen == Screen.MonitoredApps || screen == Screen.Debug) { screen = Screen.Home }
+    BackHandler(enabled = screen != Screen.Onboarding && screen != Screen.Home) { screen = Screen.Home }
 
     Scaffold { innerPadding ->
         val modifier = Modifier.padding(innerPadding)
@@ -52,6 +54,14 @@ fun BreatheInApp(container: AppContainer) {
                 monitorController = container.monitorController,
                 onOpenMonitoredApps = { screen = Screen.MonitoredApps },
                 onOpenDeveloperTools = if (BuildConfig.DEBUG) ({ screen = Screen.Debug }) else null,
+                modifier = modifier,
+                feedInsights = {
+                    FeedInsightsCard(container.feedInsights, onOpen = { screen = Screen.FeedInsights })
+                },
+            )
+            Screen.FeedInsights -> FeedInsightsScreen(
+                repository = container.feedInsights,
+                onBack = { screen = Screen.Home },
                 modifier = modifier,
             )
             Screen.MonitoredApps -> MonitoredAppsScreen(

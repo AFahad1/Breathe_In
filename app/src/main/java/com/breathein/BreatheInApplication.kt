@@ -1,6 +1,7 @@
 package com.breathein
 
 import android.app.Application
+import com.breathein.core.common.FeedContentSink
 import com.breathein.feature.monitor.MonitorDependenciesProvider
 import com.breathein.feature.monitor.SessionMonitor
 import com.breathein.feature.scrolldetect.AccessibilityScrollFeatureDetector
@@ -13,6 +14,7 @@ class BreatheInApplication : Application(), MonitorDependenciesProvider, ScrollD
 
     override val sessionMonitor: SessionMonitor get() = container.sessionMonitor
     override val scrollFeatureDetector: AccessibilityScrollFeatureDetector get() = container.scrollFeatureDetector
+    override val feedContentSink: FeedContentSink get() = container.contentInsights
 
     override fun onCreate() {
         super.onCreate()

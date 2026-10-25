@@ -6,16 +6,20 @@ import android.os.HandlerThread
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.breathein.core.common.FeedContentSink
 import com.breathein.core.common.ViewIdCapture
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Watches Instagram and YouTube windows (only those, see res/xml/scroll_detection_service.xml) and reports
- * whether Reels or Shorts is on screen. It only looks for known view IDs; it never reads text or content.
+ * whether Reels or Shorts is on screen, by known view IDs. While a feed is on screen it also passes the
+ * visible text (caption, creator, audio) to [FeedContentSink] so the user can see what their time went to.
+ * Nothing is read outside Reels / Shorts.
  */
 class ScrollDetectionService : AccessibilityService() {
 
     private var detector: AccessibilityScrollFeatureDetector? = null
+    private var feedContentSink: FeedContentSink? = null
 
     // Window queries run on their own thread: this service shares a process (and main thread) with our UI,
     // and querying our own window from the main thread would block it while it waits for itself.
@@ -35,7 +39,9 @@ class ScrollDetectionService : AccessibilityService() {
     override fun onServiceConnected() {
         workerThread.start()
         worker = Handler(workerThread.looper)
-        detector = (application as? ScrollDetectionDependenciesProvider)?.scrollFeatureDetector
+        val dependencies = application as? ScrollDetectionDependenciesProvider
+        detector = dependencies?.scrollFeatureDetector
+        feedContentSink = dependencies?.feedContentSink
         if (detector == null) Log.e(TAG, "Application does not implement ScrollDetectionDependenciesProvider")
         Log.i(TAG, "Connected")
         detector?.onServiceConnected()
@@ -57,7 +63,11 @@ class ScrollDetectionService : AccessibilityService() {
 
         val visibleIds = FeatureMarkers.idsFor(packageName).values.flatten()
             .filterTo(HashSet()) { id -> root.findAccessibilityNodeInfosByViewId(id).any { it.isVisibleToUser } }
-        detector.onWindowInspected(FeatureMarkers.match(packageName, visibleIds))
+        val feature = FeatureMarkers.match(packageName, visibleIds)
+        detector.onWindowInspected(feature)
+        if (feature != null) {
+            feedContentSink?.onFeedContent(packageName, FeedTextFilter.keep(collectTexts(root)))
+        }
 
         if (detector.captureRequested) {
             detector.onViewIdsCaptured(ViewIdCapture(packageName, collectViewIds(root)))
@@ -75,6 +85,23 @@ class ScrollDetectionService : AccessibilityService() {
         return ids.toList()
     }
 
+    /** Text and content descriptions of visible views, in screen order. */
+    private fun collectTexts(root: AccessibilityNodeInfo): List<String> {
+        val texts = mutableListOf<String>()
+        val queue = ArrayDeque(listOf(root))
+        var visited = 0
+        while (queue.isNotEmpty() && visited < MAX_NODES) {
+            val node = queue.removeFirst()
+            visited++
+            if (node.isVisibleToUser) {
+                node.text?.toString()?.let(texts::add)
+                node.contentDescription?.toString()?.let(texts::add)
+            }
+            for (i in 0 until node.childCount) node.getChild(i)?.let(queue::addLast)
+        }
+        return texts
+    }
+
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
@@ -88,5 +115,6 @@ class ScrollDetectionService : AccessibilityService() {
         const val TAG = "ScrollDetection"
         const val INSPECTION_DELAY_MILLIS = 300L
         const val MAX_CAPTURED_IDS = 200
+        const val MAX_NODES = 400
     }
 }

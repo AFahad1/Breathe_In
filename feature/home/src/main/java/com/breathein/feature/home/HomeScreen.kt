@@ -39,6 +39,7 @@ import kotlinx.coroutines.withContext
 /**
  * The main screen: today's time in monitored apps, monitoring on/off and the app list.
  *
+ * @param feedInsights "what you watched" card, provided by :feature:insights through :app.
  * @param onOpenDeveloperTools shows a "Developer tools" link when set (debug builds only).
  */
 @Composable
@@ -49,6 +50,7 @@ fun HomeScreen(
     onOpenMonitoredApps: () -> Unit,
     onOpenDeveloperTools: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    feedInsights: @Composable () -> Unit = {},
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val isMonitoring by monitorController.isRunning.collectAsStateWithLifecycle()
@@ -102,6 +104,8 @@ fun HomeScreen(
             )
             MonitoredAppsCard(apps)
         }
+
+        feedInsights()
 
         Button(
             onClick = onOpenMonitoredApps,

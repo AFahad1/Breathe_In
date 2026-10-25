@@ -1,0 +1,15 @@
+<resources>
+    <string name="insights_card_title">What you watched</string>
+    <string name="insights_card_empty">Open Reels or Shorts and Breathe In will show what your time goes to.</string>
+    <string name="insights_card_sorting">Sorting what you watched…</string>
+    <string name="insights_see_all">See everything</string>
+    <string name="insights_title">Your feed today</string>
+    <string name="insights_total">%1$s in Reels and Shorts</string>
+    <string name="insights_unsorted">Not sorted yet: %1$s</string>
+    <string name="insights_sort_now">Sort now</string>
+    <string name="insights_recent">Recently watched</string>
+    <string name="insights_unsorted_item">Sorting…</string>
+    <string name="insights_back">Back</string>
+    <string name="insights_sorted_by_ai">Sorted by Gemini from captions and creator names. Only that text leaves your phone, and only to be sorted.</string>
+    <string name="insights_sorted_by_keywords">Sorted by keywords on your phone. Set the GEMINI_API_KEY environment variable and rebuild for AI sorting.</string>
+</resources>

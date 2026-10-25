@@ -3,10 +3,10 @@
 ## What this app does
 Breathe In interrupts doom scrolling. While the user is scrolling short-form feeds (Instagram Reels, YouTube Shorts, TikTok) or any other app they pick, the app interrupts **mid-session** with a full-screen breathing animation drawn over that app. The user then either keeps scrolling or stops and does a short, wholesome check-in ("Something worth sharing with your family?").
 
-This is a feasibility MVP. Priorities: prove the interruption works mid-scroll, prove we can read usage data. Keep it simple; no backend, no network calls.
+This is a feasibility MVP. Priorities: prove the interruption works mid-scroll, prove we can read usage data. Keep it simple; no backend. The only network call is `:feature:insights` sending Reels/Shorts captions to the Gemini API to sort them into categories (only when an API key is set).
 
 ## Current scope (scaffold)
-Built: app shell, permissions, usage tracking, per-app session monitoring, Reels/Shorts detection (accessibility service), the Monitored apps page (which apps + limit per app), and the breathing overlay.
+Built: app shell, permissions, usage tracking, per-app session monitoring, Reels/Shorts detection (accessibility service), the Monitored apps page (which apps + limit per app), the breathing overlay, and feed insights (what the user watched, by category).
 Not yet: check-in, event log database, notification mode, visual design. Leave clear TODOs and empty interfaces where these will plug in.
 
 ## Tech stack
@@ -21,12 +21,13 @@ Modular so two developers can work in parallel without touching each other's fil
 
 ```
 :app                  Application class, AppContainer (wires everything), MainActivity, navigation
-:core:model           Plain data classes: AppUsage, AppInfo, MonitoredApp, SessionState, ScrollFeature, ShortFormApp, InterruptionRequest, InterruptionOutcome
+:core:model           Plain data classes: AppUsage, AppInfo, MonitoredApp, SessionState, ScrollFeature, ShortFormApp, InterruptionRequest, InterruptionOutcome, ContentCategory, FeedItem, FeedInsights
 :core:common          Interfaces shared across features (see Contracts), ShortFormApps list + constants (package names)
 :core:permissions     PermissionChecker: hasUsageAccess(), canDrawOverlays(), hasNotificationPermission(), hasAccessibilityService(), and Intents to open each settings page
 :core:settings        SettingsRepository (DataStore): monitored apps + limit per app, monitoring on/off
 :feature:usage        UsageRepository implementation using UsageStatsManager / UsageEvents
-:feature:scrolldetect AccessibilityService that detects Reels / Shorts on screen by view ID (FeatureMarkers)
+:feature:scrolldetect AccessibilityService that detects Reels / Shorts on screen by view ID (FeatureMarkers) and passes the feed's visible text to FeedContentSink
+:feature:insights     "What you watched": turns feed text into watched items, sorts them into categories with Gemini (keyword fallback), home card + Your feed screen
 :feature:monitor      Foreground service + SessionTracker (one per monitored app; times continuous sessions, fires interruptions)
 :feature:overlay      Overlay implementation: WindowManager + ComposeView + breathing animation
 :feature:apps         Monitored apps page: pick apps and a limit for each
@@ -49,8 +50,10 @@ Modular so two developers can work in parallel without touching each other's fil
   - `fun show(request: InterruptionRequest, onOutcome: (InterruptionOutcome) -> Unit)`
   - `fun dismiss()`
 - `InterruptionOutcome` = `KeepScrolling` | `ImDone`
+- `FeedContentSink` — `fun onFeedContent(packageName, texts)` (called by scrolldetect while a feed is on screen)
+- `FeedInsightsRepository` — `val insights: StateFlow<FeedInsights>`, `fun refresh()`, `fun topCategorySince(packageName, sinceMillis)`
 
-`:feature:monitor` depends only on these interfaces. `:feature:overlay` implements `InterruptionTrigger`, `:feature:scrolldetect` implements `ScrollFeatureDetector`. `:app` wires them together in `AppContainer`.
+`:feature:monitor` depends only on these interfaces. `:feature:overlay` implements `InterruptionTrigger`, `:feature:scrolldetect` implements `ScrollFeatureDetector`, `:feature:insights` implements `FeedContentSink` and `FeedInsightsRepository`. `:app` wires them together in `AppContainer` (Home gets the insights card as a composable slot).
 
 ## Behaviour
 1. **Usage tracking** — query `UsageEvents` for recent `ACTIVITY_RESUMED` / `ACTIVITY_PAUSED` events to determine the current foreground app. Use `queryAndAggregateUsageStats` (or events) for today's per-app minutes since midnight.
@@ -62,7 +65,8 @@ Modular so two developers can work in parallel without touching each other's fil
 6. **Outcomes**
    - Keep scrolling → dismiss overlay, reset the session timer (next interruption after another full threshold).
    - I'm done (button reads "Take a break") → dismiss overlay, send the user to the home screen (`Intent.ACTION_MAIN` + `CATEGORY_HOME`). TODO hook for check-in.
-7. **Limits** — set per app on the Monitored apps page. Default 10 minutes (debug builds: 1 minute). Debug builds also offer 10 s and 30 s for quick testing. Instagram, YouTube and TikTok are monitored by default.
+7. **Feed insights** — while Reels / Shorts is on screen, the accessibility service collects visible text (caption, creator, audio; buttons and counters filtered out by `FeedTextFilter`). A new item starts when the caption changes; an item lasts until the next one. Items are sorted into `ContentCategory` by Gemini (`gemini-3.8-flash` via the Google GenAI Java SDK, structured JSON output) in batches once 5 are waiting, and when the home card or Your feed screen opens (which also writes a two-sentence AI summary). The key is read at build time from the `GEMINI_API_KEY` environment variable (fallback: `GEMINI_API_KEY` in the gitignored `local.properties`); never commit it. Without a key, a keyword matcher sorts instead. Today's items live in `filesDir/feed_today.json` and reset at midnight. The break prompt names the session's top category ("Mostly gym & fitness."). The key in BuildConfig is demo-only: before release, call Gemini through a backend proxy (or move to Firebase AI Logic with App Check).
+8. **Limits** — set per app on the Monitored apps page. Default 10 minutes (debug builds: 1 minute). Debug builds also offer 10 s and 30 s for quick testing. Instagram, YouTube and TikTok are monitored by default.
 
 ## Permissions
 - `PACKAGE_USAGE_STATS` (Usage Access, user grants in Settings)

@@ -3,6 +3,7 @@ package com.breathein
 import android.content.Context
 import com.breathein.core.common.CheckInLauncher
 import com.breathein.core.common.EventLog
+import com.breathein.core.common.FeedInsightsRepository
 import com.breathein.core.common.InterruptionTrigger
 import com.breathein.core.common.MonitorController
 import com.breathein.core.common.NoOpCheckInLauncher
@@ -11,6 +12,7 @@ import com.breathein.core.common.ScrollFeatureDetector
 import com.breathein.core.common.UsageRepository
 import com.breathein.core.permissions.PermissionChecker
 import com.breathein.core.settings.SettingsRepository
+import com.breathein.feature.insights.ContentInsightsRepository
 import com.breathein.feature.monitor.ServiceMonitorController
 import com.breathein.feature.monitor.SessionMonitor
 import com.breathein.feature.overlay.OverlayInterruptionTrigger
@@ -34,6 +36,10 @@ class AppContainer(context: Context) {
     /** Concrete type so ScrollDetectionService can feed it; everyone else sees [ScrollFeatureDetector]. */
     val scrollFeatureDetector = AccessibilityScrollFeatureDetector()
 
+    /** Fed by ScrollDetectionService (as a FeedContentSink); everyone else sees [FeedInsightsRepository]. */
+    val contentInsights = ContentInsightsRepository(appContext, applicationScope)
+    val feedInsights: FeedInsightsRepository = contentInsights
+
     // TODO(check-in): replace with the real check-in once it exists.
     private val checkInLauncher: CheckInLauncher = NoOpCheckInLauncher
 
@@ -49,6 +55,7 @@ class AppContainer(context: Context) {
         permissionChecker = permissionChecker,
         checkInLauncher = checkInLauncher,
         eventLog = eventLog,
+        feedInsights = feedInsights,
     )
 
     val monitorController: MonitorController =

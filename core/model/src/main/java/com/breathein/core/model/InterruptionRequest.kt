@@ -9,4 +9,6 @@ data class InterruptionRequest(
     val feedName: String? = null,
     /** How long the user has been scrolling when the break was triggered. */
     val scrolledSeconds: Int = 0,
+    /** What this session's videos were mostly about ("Gym & fitness"), when known. */
+    val topCategory: ContentCategory? = null,
 )

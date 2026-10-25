@@ -48,14 +48,10 @@ private fun AppRow(app: AppToday) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(app.label, style = MaterialTheme.typography.bodyLarge)
-            val limit = formatLimit(app.limitSeconds)
+            // "YouTube Shorts", "Instagram Reels", or just the app name.
+            Text(listOfNotNull(app.label, app.feedName).joinToString(" "), style = MaterialTheme.typography.bodyLarge)
             Text(
-                text = if (app.feedName != null) {
-                    stringResource(R.string.home_app_feed_limit, app.feedName, limit)
-                } else {
-                    stringResource(R.string.home_app_limit, limit)
-                },
+                text = stringResource(R.string.home_app_limit, formatLimit(app.limitSeconds)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -1,7 +1,7 @@
 <resources>
     <string name="home_app_name">BREATHE IN</string>
     <string name="home_title">Take a breath\nbefore the next scroll.</string>
-    <string name="home_minutes_today">minutes in your apps today</string>
+    <string name="home_minutes_today">minutes spent doom scrolling today</string>
     <string name="home_monitoring_on">Looking out for you</string>
     <string name="home_monitoring_on_detail">You\'ll get a breathing break when you scroll too long.</string>
     <string name="home_monitoring_off">Paused</string>
@@ -9,7 +9,6 @@
     <string name="home_your_apps">Your apps</string>
     <string name="home_loading">Loading…</string>
     <string name="home_no_apps">No apps yet. Choose the apps you want breaks in.</string>
-    <string name="home_app_feed_limit">%1$s · break after %2$s</string>
     <string name="home_app_limit">Break after %1$s</string>
     <string name="home_app_minutes">%1$d min</string>
     <string name="home_choose_apps">Choose apps and limits</string>

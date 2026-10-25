@@ -108,7 +108,7 @@ internal fun BreathingOverlay(
     }
 }
 
-/** "You've been on Instagram Reels for 2 min." + "Take a breathing break in…" */
+/** "You've been on Instagram Reels for 2 min." + "Mostly gym & fitness." + "Take a breathing break in…" */
 @Composable
 private fun PromptMessage(request: InterruptionRequest, modifier: Modifier = Modifier) {
     val scrolled = formatLimit(request.scrolledSeconds.coerceAtLeast(1))
@@ -120,6 +120,14 @@ private fun PromptMessage(request: InterruptionRequest, modifier: Modifier = Mod
             color = Color.White.copy(alpha = 0.8f),
             textAlign = TextAlign.Center,
         )
+        request.topCategory?.let { category ->
+            Text(
+                text = stringResource(R.string.overlay_prompt_topic, category.label.lowercase()),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center,
+            )
+        }
         Text(
             text = stringResource(R.string.overlay_prompt_title),
             style = MaterialTheme.typography.headlineSmall,

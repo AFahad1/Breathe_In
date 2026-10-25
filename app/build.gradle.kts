@@ -21,6 +21,11 @@ android {
         buildConfig = true
     }
 
+    packaging {
+        // Duplicate license/notice files from the Gemini SDK's dependencies.
+        resources.excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/INDEX.LIST")
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -33,6 +38,7 @@ dependencies {
     implementation(project(":core:settings"))
     implementation(project(":feature:usage"))
     implementation(project(":feature:scrolldetect"))
+    implementation(project(":feature:insights"))
     implementation(project(":feature:apps"))
     implementation(project(":feature:home"))
     implementation(project(":feature:monitor"))
