@@ -1,5 +1,8 @@
 <resources>
     <string name="overlay_today_usage">%1$s today: %2$d min</string>
+    <string name="overlay_prompt_scrolled">You\'ve been on %1$s for %2$s.</string>
+    <string name="overlay_prompt_title">Take a breathing break in…</string>
+    <string name="overlay_skip_hint">Tap anywhere to keep scrolling</string>
     <string name="overlay_breathe_in">Breathe in</string>
     <string name="overlay_hold">Hold</string>
     <string name="overlay_breathe_out">Breathe out</string>

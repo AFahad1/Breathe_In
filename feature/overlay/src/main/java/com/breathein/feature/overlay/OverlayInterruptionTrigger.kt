@@ -1,5 +1,6 @@
 package com.breathein.feature.overlay
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
@@ -25,6 +26,7 @@ class OverlayInterruptionTrigger(context: Context) : InterruptionTrigger {
     // Only touched on the main thread.
     private var overlayView: ComposeView? = null
     private var lifecycleOwner: OverlayLifecycleOwner? = null
+    private var blurAnimator: ValueAnimator? = null
 
     override fun show(request: InterruptionRequest, onOutcome: (InterruptionOutcome) -> Unit) = onMainThread {
         if (overlayView != null) return@onMainThread
@@ -53,8 +55,9 @@ class OverlayInterruptionTrigger(context: Context) : InterruptionTrigger {
             }
         }
 
+        val params = overlayLayoutParams(blurBehind)
         try {
-            windowManager.addView(view, overlayLayoutParams(blurBehind))
+            windowManager.addView(view, params)
         } catch (e: RuntimeException) {
             // BadTokenException / SecurityException if the permission was revoked a moment ago.
             Log.e(TAG, "Could not add overlay", e)
@@ -64,6 +67,26 @@ class OverlayInterruptionTrigger(context: Context) : InterruptionTrigger {
         owner.resume()
         overlayView = view
         lifecycleOwner = owner
+        if (blurBehind) fadeInBlur(view, params)
+    }
+
+    /** Ramps the blur from none to full over the countdown, so the app behind fades out gently. */
+    private fun fadeInBlur(view: ComposeView, params: WindowManager.LayoutParams) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        blurAnimator = ValueAnimator.ofInt(0, BLUR_RADIUS_PX).apply {
+            duration = COUNTDOWN_SECONDS * 1_000L
+            addUpdateListener { animator ->
+                val radius = animator.animatedValue as Int
+                if (overlayView !== view || params.blurBehindRadius == radius) return@addUpdateListener
+                params.blurBehindRadius = radius
+                try {
+                    windowManager.updateViewLayout(view, params)
+                } catch (e: IllegalArgumentException) {
+                    cancel() // The overlay was removed mid-animation.
+                }
+            }
+            start()
+        }
     }
 
     override fun dismiss() = onMainThread { removeOverlay() }
@@ -71,6 +94,8 @@ class OverlayInterruptionTrigger(context: Context) : InterruptionTrigger {
     private fun removeOverlay() {
         val view = overlayView ?: return
         overlayView = null
+        blurAnimator?.cancel()
+        blurAnimator = null
         try {
             windowManager.removeView(view)
         } catch (e: IllegalArgumentException) {
@@ -94,7 +119,7 @@ class OverlayInterruptionTrigger(context: Context) : InterruptionTrigger {
     ).apply {
         if (blurBehind && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             flags = flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
-            blurBehindRadius = BLUR_RADIUS_PX
+            blurBehindRadius = 0 // Raised gradually by fadeInBlur().
         }
         // Draw behind the status and navigation bars; the Compose content pads itself for them.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

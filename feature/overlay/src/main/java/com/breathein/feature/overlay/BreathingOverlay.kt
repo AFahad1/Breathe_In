@@ -1,6 +1,9 @@
 package com.breathein.feature.overlay
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,6 +24,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,8 +32,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.breathein.core.common.formatLimit
 import com.breathein.core.model.InterruptionOutcome
 import com.breathein.core.model.InterruptionRequest
 
@@ -47,8 +53,14 @@ internal fun BreathingOverlay(
 ) {
     val breathing = rememberBreathingState()
     val finished = breathing.phase == BreathingPhase.Finished
+    val countingDown = breathing.phase == BreathingPhase.Countdown
     // Without blur, a darker tint keeps the text readable over a busy app.
-    val tint = Color.Black.copy(alpha = if (backgroundBlurred) 0.35f else 0.7f)
+    // It fades in over the countdown, together with the window blur (see OverlayInterruptionTrigger).
+    val tintAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        tintAlpha.animateTo(if (backgroundBlurred) 0.35f else 0.7f, tween(COUNTDOWN_SECONDS * 1_000, easing = LinearEasing))
+    }
+    val tint = Color.Black.copy(alpha = tintAlpha.value)
 
     // TODO(design): placeholder visuals.
     MaterialTheme(colorScheme = darkColorScheme()) {
@@ -68,20 +80,53 @@ internal fun BreathingOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text = stringResource(R.string.overlay_today_usage, request.appLabel, request.todayMinutes),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    modifier = Modifier.padding(top = 32.dp),
-                )
+                if (countingDown) {
+                    PromptMessage(request, modifier = Modifier.padding(top = 32.dp))
+                } else {
+                    Text(
+                        text = stringResource(R.string.overlay_today_usage, request.appLabel, request.todayMinutes),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        modifier = Modifier.padding(top = 32.dp),
+                    )
+                }
 
                 BreathingCircle(breathing)
 
                 Box(modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp), contentAlignment = Alignment.Center) {
+                    if (countingDown) {
+                        Text(
+                            text = stringResource(R.string.overlay_skip_hint),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.7f),
+                        )
+                    }
                     OutcomeButtons(visible = finished, onOutcome = onOutcome)
                 }
             }
         }
+    }
+}
+
+/** "You've been on Instagram Reels for 2 min." + "Take a breathing break in…" */
+@Composable
+private fun PromptMessage(request: InterruptionRequest, modifier: Modifier = Modifier) {
+    val scrolled = formatLimit(request.scrolledSeconds.coerceAtLeast(1))
+    val where = request.feedName?.let { "${request.appLabel} $it" } ?: request.appLabel
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = stringResource(R.string.overlay_prompt_scrolled, where, scrolled),
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White.copy(alpha = 0.8f),
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = stringResource(R.string.overlay_prompt_title),
+            style = MaterialTheme.typography.headlineSmall,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
 }
 
@@ -100,11 +145,19 @@ private fun BreathingCircle(breathing: BreathingState) {
                 .background(Color.Black)
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
         )
-        Text(
-            text = stringResource(breathing.phase.labelRes()),
-            style = MaterialTheme.typography.headlineMedium,
-            color = Color.White,
-        )
+        if (breathing.phase == BreathingPhase.Countdown) {
+            Text(
+                text = breathing.countdown.toString(),
+                style = MaterialTheme.typography.displayMedium,
+                color = Color.White,
+            )
+        } else {
+            Text(
+                text = stringResource(breathing.phase.labelRes()),
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.White,
+            )
+        }
     }
 }
 
@@ -126,7 +179,7 @@ private fun OutcomeButtons(visible: Boolean, onOutcome: (InterruptionOutcome) ->
 }
 
 private fun BreathingPhase.labelRes(): Int = when (this) {
-    BreathingPhase.BreatheIn -> R.string.overlay_breathe_in
+    BreathingPhase.Countdown, BreathingPhase.BreatheIn -> R.string.overlay_breathe_in
     BreathingPhase.Hold -> R.string.overlay_hold
     BreathingPhase.BreatheOut -> R.string.overlay_breathe_out
     BreathingPhase.Finished -> R.string.overlay_finished
@@ -137,5 +190,8 @@ private const val CIRCLE_SIZE = 280
 @Preview
 @Composable
 private fun BreathingOverlayPreview() {
-    BreathingOverlay(InterruptionRequest("com.instagram.android", "Instagram", 42), backgroundBlurred = false) {}
+    BreathingOverlay(
+        InterruptionRequest("com.instagram.android", "Instagram", 42, feedName = "Reels", scrolledSeconds = 120),
+        backgroundBlurred = false,
+    ) {}
 }

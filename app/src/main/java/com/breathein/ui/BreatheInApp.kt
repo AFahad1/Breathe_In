@@ -11,18 +11,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.breathein.AppContainer
+import com.breathein.BuildConfig
 import com.breathein.feature.apps.MonitoredAppsScreen
 import com.breathein.feature.debug.DebugScreen
+import com.breathein.feature.home.HomeScreen
 import com.breathein.feature.onboarding.OnboardingScreen
 
-private enum class Screen { Onboarding, Debug, MonitoredApps }
+private enum class Screen { Onboarding, Home, MonitoredApps, Debug }
 
-/** Top-level navigation: onboarding while any permission is missing, otherwise the debug screen. */
+/** Top-level navigation: onboarding while any permission is missing, otherwise the home screen. */
 @Composable
 fun BreatheInApp(container: AppContainer) {
     val permissionChecker = container.permissionChecker
     var screen by rememberSaveable {
-        mutableStateOf(if (permissionChecker.allGranted()) Screen.Debug else Screen.Onboarding)
+        mutableStateOf(if (permissionChecker.allGranted()) Screen.Home else Screen.Onboarding)
     }
 
     // A permission can be revoked in Settings at any time; send the user back to onboarding.
@@ -31,7 +33,7 @@ fun BreatheInApp(container: AppContainer) {
         onPauseOrDispose { }
     }
 
-    BackHandler(enabled = screen == Screen.MonitoredApps) { screen = Screen.Debug }
+    BackHandler(enabled = screen == Screen.MonitoredApps || screen == Screen.Debug) { screen = Screen.Home }
 
     Scaffold { innerPadding ->
         val modifier = Modifier.padding(innerPadding)
@@ -40,8 +42,22 @@ fun BreatheInApp(container: AppContainer) {
                 permissionChecker = permissionChecker,
                 onStartMonitoring = {
                     container.monitorController.start()
-                    screen = Screen.Debug
+                    screen = Screen.Home
                 },
+                modifier = modifier,
+            )
+            Screen.Home -> HomeScreen(
+                usageRepository = container.usageRepository,
+                settingsRepository = container.settingsRepository,
+                monitorController = container.monitorController,
+                onOpenMonitoredApps = { screen = Screen.MonitoredApps },
+                onOpenDeveloperTools = if (BuildConfig.DEBUG) ({ screen = Screen.Debug }) else null,
+                modifier = modifier,
+            )
+            Screen.MonitoredApps -> MonitoredAppsScreen(
+                usageRepository = container.usageRepository,
+                settingsRepository = container.settingsRepository,
+                onDone = { screen = Screen.Home },
                 modifier = modifier,
             )
             Screen.Debug -> DebugScreen(
@@ -52,12 +68,6 @@ fun BreatheInApp(container: AppContainer) {
                 monitorController = container.monitorController,
                 interruptionTrigger = container.interruptionTrigger,
                 onOpenMonitoredApps = { screen = Screen.MonitoredApps },
-                modifier = modifier,
-            )
-            Screen.MonitoredApps -> MonitoredAppsScreen(
-                usageRepository = container.usageRepository,
-                settingsRepository = container.settingsRepository,
-                onDone = { screen = Screen.Debug },
                 modifier = modifier,
             )
         }

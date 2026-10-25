@@ -1,0 +1,4 @@
+<resources>
+    <!-- Matches the Compose background so there's no flash on launch. -->
+    <color name="background">#FF0A0A0A</color>
+</resources>
